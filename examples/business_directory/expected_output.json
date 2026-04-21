@@ -1,0 +1,19 @@
+[
+  {
+    "source": "examples/business_directory/volleyball_clubs_2024.pdf",
+    "confidence": 0.93,
+    "missing_fields": [],
+    "warnings": [],
+    "data": {
+      "club_name": "Bayside Volleyball Club",
+      "club_type": "mixed",
+      "contact_name": "James O'Sullivan",
+      "email": "president@baysidevc.org.au",
+      "phone": "+61 3 9876 5432",
+      "website": "https://www.baysidevc.org.au",
+      "city": "Melbourne",
+      "state": "VIC",
+      "founded_year": 1998
+    }
+  }
+]

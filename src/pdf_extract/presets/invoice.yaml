@@ -1,0 +1,56 @@
+name: "Supplier invoice"
+description: "Standard invoice extraction covering supplier, customer, line items, totals, and tax."
+instructions: |
+  - invoice_number should be the supplier's reference, not any internal PO number.
+  - Currency codes use ISO 4217 (USD, AUD, GBP, EUR). If the currency is shown as a symbol only,
+    infer from locale cues (e.g. "AUD" from ABN, address, or "GST" mention).
+  - Strip currency symbols and thousand separators from numeric fields.
+
+fields:
+  - name: invoice_number
+    type: string
+    required: true
+    description: "Supplier's invoice reference number."
+
+  - name: invoice_date
+    type: date
+    required: true
+
+  - name: due_date
+    type: date
+
+  - name: supplier_name
+    type: string
+    required: true
+
+  - name: supplier_tax_id
+    type: string
+    description: "Supplier ABN, VAT number, or equivalent tax ID."
+
+  - name: customer_name
+    type: string
+
+  - name: customer_address
+    type: string
+
+  - name: currency
+    type: string
+    description: "ISO 4217 currency code."
+
+  - name: subtotal
+    type: number
+
+  - name: tax_amount
+    type: number
+
+  - name: total_amount
+    type: number
+    required: true
+
+  - name: line_item_count
+    type: integer
+    description: "Number of line items on the invoice."
+
+  - name: payment_terms
+    type: string
+    description: "Payment terms (e.g. 'Net 30', '7 days')."

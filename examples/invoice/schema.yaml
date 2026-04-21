@@ -1,0 +1,47 @@
+name: "Acme Corp supplier invoice"
+description: "Custom schema tuned for Acme Corp's accounts-payable workflow."
+instructions: |
+  - Our PO numbers start with 'PO-' followed by 6 digits.
+  - GL codes are always 4 digits.
+
+fields:
+  - name: invoice_number
+    type: string
+    required: true
+
+  - name: po_number
+    type: string
+    description: "Our purchase order reference, format PO-NNNNNN."
+
+  - name: supplier_name
+    type: string
+    required: true
+
+  - name: supplier_abn
+    type: string
+    description: "Australian Business Number, 11 digits."
+
+  - name: invoice_date
+    type: date
+    required: true
+
+  - name: due_date
+    type: date
+
+  - name: subtotal
+    type: number
+
+  - name: gst
+    type: number
+    description: "GST amount (10% in AU)."
+
+  - name: total
+    type: number
+    required: true
+
+  - name: gl_code
+    type: string
+    description: "4-digit general ledger code if listed."
+
+  - name: payment_terms
+    type: string

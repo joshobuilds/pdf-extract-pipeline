@@ -1,0 +1,51 @@
+name: "Bank statement"
+description: "Generic bank statement extraction: account details, period, balances, and transaction aggregates."
+instructions: |
+  - account_number_last4 only. Never capture the full account number.
+  - Strip currency symbols and thousand separators from numeric fields.
+  - If the statement covers a partial period or was re-issued, add a warning.
+
+fields:
+  - name: institution_name
+    type: string
+    required: true
+
+  - name: account_holder_name
+    type: string
+    required: true
+
+  - name: account_number_last4
+    type: string
+    description: "Last 4 digits of account number only."
+
+  - name: account_type
+    type: string
+    description: "e.g. 'Everyday', 'Savings', 'Offset', 'Credit Card'."
+
+  - name: statement_period_start
+    type: date
+    required: true
+
+  - name: statement_period_end
+    type: date
+    required: true
+
+  - name: opening_balance
+    type: number
+
+  - name: closing_balance
+    type: number
+    required: true
+
+  - name: total_credits
+    type: number
+
+  - name: total_debits
+    type: number
+
+  - name: transaction_count
+    type: integer
+
+  - name: currency
+    type: string
+    description: "ISO 4217 currency code."

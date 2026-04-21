@@ -1,0 +1,28 @@
+[
+  {
+    "source": "examples/cafe_menu/riyadh_cafe_menu.pdf",
+    "confidence": 0.91,
+    "missing_fields": [],
+    "warnings": [
+      "Menu is in Arabic and English. Extracted using the English text primarily."
+    ],
+    "data": {
+      "cafe_name": "Qahwa House",
+      "menu_date": "2026-03-15",
+      "currency": "SAR",
+      "item_count": 42,
+      "categories": [
+        "Hot Coffee",
+        "Cold Coffee",
+        "Specialty Drinks",
+        "Pastries",
+        "Breakfast",
+        "Sandwiches"
+      ],
+      "cheapest_item_name": "Black Tea",
+      "cheapest_item_price": 8.0,
+      "most_expensive_item_name": "Breakfast Platter",
+      "most_expensive_item_price": 65.0
+    }
+  }
+]

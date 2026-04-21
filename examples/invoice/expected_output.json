@@ -1,0 +1,21 @@
+[
+  {
+    "source": "examples/invoice/sample_invoice.pdf",
+    "confidence": 0.97,
+    "missing_fields": [],
+    "warnings": [],
+    "data": {
+      "invoice_number": "INV-2026-0419",
+      "po_number": "PO-104872",
+      "supplier_name": "Sydney Steel & Fabrication Pty Ltd",
+      "supplier_abn": "51 824 753 556",
+      "invoice_date": "2026-04-15",
+      "due_date": "2026-05-15",
+      "subtotal": 8750.00,
+      "gst": 875.00,
+      "total": 9625.00,
+      "gl_code": "6420",
+      "payment_terms": "Net 30"
+    }
+  }
+]

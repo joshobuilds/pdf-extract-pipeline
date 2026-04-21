@@ -1,0 +1,40 @@
+name: "Cafe menu"
+description: "Extract menu items and prices from cafe menu PDFs or delivery-app screenshot PDFs."
+instructions: |
+  - Output prices as numbers without currency symbols.
+  - category_name should match the heading used on the menu (e.g. 'Coffee', 'Cold Drinks', 'Breakfast').
+  - If an item has size variants (small/medium/large), list each variant as a separate row using the base item_name.
+
+fields:
+  - name: cafe_name
+    type: string
+    required: true
+
+  - name: menu_date
+    type: date
+    description: "Effective date of the menu if printed."
+
+  - name: currency
+    type: string
+    description: "ISO 4217 currency code."
+
+  - name: item_count
+    type: integer
+    description: "Total number of distinct menu items across all categories."
+
+  - name: categories
+    type: array
+    item_type: string
+    description: "List of category names as they appear on the menu."
+
+  - name: cheapest_item_name
+    type: string
+
+  - name: cheapest_item_price
+    type: number
+
+  - name: most_expensive_item_name
+    type: string
+
+  - name: most_expensive_item_price
+    type: number

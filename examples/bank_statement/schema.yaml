@@ -1,0 +1,51 @@
+name: "Australian personal bank statement"
+description: "CBA / Westpac / NAB / ANZ retail account statements. Privacy-safe, only last 4 of account number."
+instructions: |
+  - Account numbers: capture only the final 4 digits. Never the full number.
+  - Normalize bank names to official form (e.g. "Commonwealth Bank of Australia" not "CBA").
+
+fields:
+  - name: bank_name
+    type: string
+    required: true
+
+  - name: account_holder_name
+    type: string
+    required: true
+
+  - name: account_number_last4
+    type: string
+    description: "Last 4 digits only."
+
+  - name: account_type
+    type: string
+    enum: [everyday, savings, offset, credit_card, term_deposit, other]
+
+  - name: statement_period_start
+    type: date
+    required: true
+
+  - name: statement_period_end
+    type: date
+    required: true
+
+  - name: opening_balance
+    type: number
+
+  - name: closing_balance
+    type: number
+    required: true
+
+  - name: total_credits
+    type: number
+
+  - name: total_debits
+    type: number
+
+  - name: transaction_count
+    type: integer
+
+  - name: recurring_direct_debits
+    type: array
+    item_type: string
+    description: "Names of recurring direct debit merchants (e.g. 'Netflix', 'AGL Electricity')."

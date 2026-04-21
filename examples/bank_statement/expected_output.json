@@ -1,0 +1,30 @@
+[
+  {
+    "source": "examples/bank_statement/march_2026_statement.pdf",
+    "confidence": 0.94,
+    "missing_fields": [],
+    "warnings": [
+      "Page 3 has a slight scanning artifact on the transaction table but all amounts were legible."
+    ],
+    "data": {
+      "bank_name": "Commonwealth Bank of Australia",
+      "account_holder_name": "Sarah Mitchell",
+      "account_number_last4": "7842",
+      "account_type": "everyday",
+      "statement_period_start": "2026-03-01",
+      "statement_period_end": "2026-03-31",
+      "opening_balance": 4287.50,
+      "closing_balance": 5913.22,
+      "total_credits": 8450.00,
+      "total_debits": 6824.28,
+      "transaction_count": 47,
+      "recurring_direct_debits": [
+        "Netflix",
+        "AGL Electricity",
+        "Telstra",
+        "Gym membership - Fitness First",
+        "Spotify"
+      ]
+    }
+  }
+]

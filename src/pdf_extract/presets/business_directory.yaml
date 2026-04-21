@@ -1,0 +1,47 @@
+name: "Business directory entry"
+description: "Extract business listings from directory PDFs: trade shows, association member lists, yellow-page style catalogs."
+instructions: |
+  - If a PDF contains multiple business entries, extract the primary/featured one unless the user has batched per-entry.
+  - Phone numbers: output in international format where country can be inferred (e.g. +61 3 9123 4567). Otherwise keep original.
+  - website should be a full URL including scheme (https://).
+
+fields:
+  - name: business_name
+    type: string
+    required: true
+
+  - name: business_type
+    type: string
+    description: "Industry or category label as listed in the directory."
+
+  - name: contact_name
+    type: string
+
+  - name: phone
+    type: string
+
+  - name: email
+    type: string
+
+  - name: website
+    type: string
+
+  - name: street_address
+    type: string
+
+  - name: city
+    type: string
+    required: true
+
+  - name: state
+    type: string
+
+  - name: postcode
+    type: string
+
+  - name: country
+    type: string
+
+  - name: description_blurb
+    type: string
+    description: "Short description or tagline as shown in the directory."

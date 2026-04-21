@@ -1,0 +1,39 @@
+name: "Volleyball club directory entry"
+description: "Custom schema for a volleyball association directory PDF."
+instructions: |
+  - Club types: classify as one of 'junior', 'senior', 'mixed', 'masters', 'school'.
+  - state should use the two-letter Australian state abbreviation (NSW, VIC, QLD, WA, SA, TAS, NT, ACT).
+  - Ensure website is a full URL including https://.
+
+fields:
+  - name: club_name
+    type: string
+    required: true
+
+  - name: club_type
+    type: string
+    enum: [junior, senior, mixed, masters, school]
+
+  - name: contact_name
+    type: string
+
+  - name: email
+    type: string
+
+  - name: phone
+    type: string
+
+  - name: website
+    type: string
+
+  - name: city
+    type: string
+    required: true
+
+  - name: state
+    type: string
+    enum: [NSW, VIC, QLD, WA, SA, TAS, NT, ACT]
+    required: true
+
+  - name: founded_year
+    type: integer

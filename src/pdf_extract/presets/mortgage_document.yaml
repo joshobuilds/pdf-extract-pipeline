@@ -1,0 +1,101 @@
+name: "Australian mortgage application document"
+description: >
+  Unified extraction schema for mortgage broker document packs: payslips, bank statements,
+  tax returns (ATO Notices of Assessment), and employment letters. Covers income, liabilities,
+  expenses, and asset signals used to build deal submissions.
+instructions: |
+  - document_type: classify the document as one of payslip, bank_statement, tax_return, ato_notice, employment_letter, other.
+  - All dollar amounts are Australian dollars. Strip "$" and thousand separators.
+  - For bank statements, closing_balance = the final balance on the statement period.
+  - For payslips, gross_income_ytd is year-to-date gross from the payslip summary area.
+  - Employer and lender names keep original casing (e.g. "Commonwealth Bank of Australia").
+  - If a document is partially illegible (scan quality), lower _confidence and add a warning per affected field.
+
+fields:
+  - name: document_type
+    type: string
+    required: true
+    enum: [payslip, bank_statement, tax_return, ato_notice, employment_letter, other]
+    description: "Classification of the document."
+
+  - name: client_name
+    type: string
+    required: true
+    description: "Full name of the client the document belongs to."
+
+  - name: document_date
+    type: date
+    description: "Date issued or statement period end date (ISO YYYY-MM-DD)."
+
+  - name: period_start
+    type: date
+    description: "Statement or pay period start date."
+
+  - name: period_end
+    type: date
+    description: "Statement or pay period end date."
+
+  - name: employer_name
+    type: string
+    description: "Employer name (payslips and employment letters only)."
+
+  - name: gross_income_period
+    type: number
+    description: "Gross income for the pay period shown (AUD)."
+
+  - name: gross_income_ytd
+    type: number
+    description: "Year-to-date gross income (AUD)."
+
+  - name: net_income_period
+    type: number
+    description: "Net/take-home income for the pay period (AUD)."
+
+  - name: tax_paid_period
+    type: number
+    description: "Tax withheld for the pay period (AUD)."
+
+  - name: institution_name
+    type: string
+    description: "Bank or financial institution name (bank statements only)."
+
+  - name: account_number_last4
+    type: string
+    description: "Last 4 digits of account number. Never capture the full number."
+
+  - name: opening_balance
+    type: number
+    description: "Opening balance for the statement period (AUD)."
+
+  - name: closing_balance
+    type: number
+    description: "Closing balance for the statement period (AUD)."
+
+  - name: total_credits
+    type: number
+    description: "Sum of credits during the statement period (AUD)."
+
+  - name: total_debits
+    type: number
+    description: "Sum of debits during the statement period (AUD)."
+
+  - name: recurring_commitments
+    type: array
+    item_type: string
+    description: "List of recurring monthly outgoings identified (e.g. 'CBA Home Loan $2,400', 'Afterpay $150')."
+
+  - name: taxable_income
+    type: number
+    description: "Total taxable income per tax return or ATO notice (AUD)."
+
+  - name: tax_assessed
+    type: number
+    description: "Total tax assessed per ATO notice (AUD)."
+
+  - name: refund_or_liability
+    type: number
+    description: "Refund (positive) or liability (negative) per ATO notice."
+
+  - name: financial_year
+    type: string
+    description: "Financial year (e.g. '2024-25')."
