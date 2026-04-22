@@ -229,12 +229,26 @@ export default function HomePage() {
               ))}
             </div>
             {preset === 'custom' && (
-              <textarea
-                value={customYaml}
-                onChange={(e) => setCustomYaml(e.target.value)}
-                spellCheck={false}
-                className="mt-3 w-full h-64 font-mono text-xs rounded-lg border border-neutral-300 p-3 focus:outline-none focus:ring-2 focus:ring-neutral-400"
-              />
+              <div className="mt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-neutral-500">
+                    YAML is whitespace-sensitive. If pasting loses indentation, click Reset.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setCustomYaml(EXAMPLE_CUSTOM_YAML)}
+                    className="text-xs rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-50"
+                  >
+                    Reset to example
+                  </button>
+                </div>
+                <textarea
+                  value={customYaml}
+                  onChange={(e) => setCustomYaml(e.target.value)}
+                  spellCheck={false}
+                  className="w-full h-64 font-mono text-xs rounded-lg border border-neutral-300 p-3 focus:outline-none focus:ring-2 focus:ring-neutral-400"
+                />
+              </div>
             )}
           </section>
 
@@ -248,7 +262,14 @@ export default function HomePage() {
 
           {error && (
             <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-800">
-              {error}
+              <div>{error}</div>
+              {/Schema YAML is invalid|Map keys must be unique|Implicit keys/i.test(error) && (
+                <div className="mt-2 text-red-700">
+                  Tip: pasting YAML sometimes drops indentation. Click{' '}
+                  <span className="font-semibold">Reset to example</span> above the textarea,
+                  then edit the template in place.
+                </div>
+              )}
             </div>
           )}
         </form>
