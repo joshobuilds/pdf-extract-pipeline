@@ -230,14 +230,14 @@ export default function HomePage() {
             </div>
             {preset === 'custom' && (
               <div className="mt-3">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between gap-2 mb-2">
                   <p className="text-xs text-neutral-500">
                     YAML is whitespace-sensitive. If pasting loses indentation, click Reset.
                   </p>
                   <button
                     type="button"
                     onClick={() => setCustomYaml(EXAMPLE_CUSTOM_YAML)}
-                    className="text-xs rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-50"
+                    className="shrink-0 whitespace-nowrap text-xs rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-50"
                   >
                     Reset to example
                   </button>
