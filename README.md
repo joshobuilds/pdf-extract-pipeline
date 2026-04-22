@@ -2,6 +2,10 @@
 
 **Turn messy PDFs into clean, structured data.** Drop in a PDF, define the fields you want in a YAML config, get JSON and Excel back. Powered by Gemini 2.5 Flash with function calling.
 
+Two interfaces:
+- **CLI** — batch-process a folder of PDFs from the terminal or Python API.
+- **Web app** (`web/`) — drag-and-drop one PDF, pick a preset or paste a schema, download the result. Next.js + Vercel deployable.
+
 Built for freelance workflows where clients send a folder of PDFs and want the fields extracted, normalized, and handed back in a spreadsheet. Swap schemas in 30 seconds to target any document type: invoices, bank statements, tax returns, business directories, menus, resumes, construction takeoffs.
 
 ---
