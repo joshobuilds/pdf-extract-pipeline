@@ -16,6 +16,18 @@ type SchemaShape = {
   fields: { name: string }[];
 };
 
+type FileStatus = 'pending' | 'running' | 'done' | 'error';
+
+type FileItem = {
+  id: string;
+  file: File;
+  status: FileStatus;
+  result?: ExtractionResult;
+  error?: string;
+};
+
+const MAX_FILES = 10;
+
 const PRESET_OPTIONS: { value: string; label: string; hint: string }[] = [
   { value: 'invoice', label: 'Invoice', hint: 'Supplier, customer, totals, tax, payment terms' },
   { value: 'bank_statement', label: 'Bank statement', hint: 'Account details, period, balances' },
@@ -44,72 +56,111 @@ fields:
 `;
 
 export default function HomePage() {
-  const [file, setFile] = useState<File | null>(null);
+  const [items, setItems] = useState<FileItem[]>([]);
   const [preset, setPreset] = useState('invoice');
   const [customYaml, setCustomYaml] = useState(EXAMPLE_CUSTOM_YAML);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<ExtractionResult | null>(null);
   const [schema, setSchema] = useState<SchemaShape | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const onPick = useCallback((f: File | null) => {
+  const addFiles = useCallback((files: FileList | File[] | null) => {
+    if (!files) return;
     setError(null);
-    setResult(null);
-    setSchema(null);
-    if (f && f.type !== 'application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) {
-      setError('Please upload a PDF file.');
-      return;
+    const incoming = Array.from(files);
+    const pdfs: FileItem[] = [];
+    for (const f of incoming) {
+      if (f.type !== 'application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) {
+        setError(`Skipped non-PDF file: ${f.name}`);
+        continue;
+      }
+      pdfs.push({
+        id: `${f.name}-${f.size}-${f.lastModified}-${Math.random().toString(36).slice(2, 7)}`,
+        file: f,
+        status: 'pending',
+      });
     }
-    setFile(f);
+    setItems((prev) => {
+      const merged = [...prev, ...pdfs];
+      if (merged.length > MAX_FILES) {
+        setError(`Capped at ${MAX_FILES} files per run. Extra files were dropped.`);
+        return merged.slice(0, MAX_FILES);
+      }
+      return merged;
+    });
   }, []);
+
+  const removeItem = (id: string) => {
+    setItems((prev) => prev.filter((it) => it.id !== id));
+  };
+
+  const clearAll = () => {
+    setItems([]);
+    setSchema(null);
+    setError(null);
+    setExpanded({});
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    const f = e.dataTransfer.files?.[0] ?? null;
-    onPick(f);
+    addFiles(e.dataTransfer.files);
+  };
+
+  const patchItem = (id: string, patch: Partial<FileItem>) => {
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
   };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) {
-      setError('Pick a PDF first.');
+    if (items.length === 0) {
+      setError('Add at least one PDF.');
       return;
     }
     setLoading(true);
     setError(null);
-    setResult(null);
     setSchema(null);
 
-    try {
-      const pdfBase64 = await fileToBase64(file);
-      const body =
-        preset === 'custom'
-          ? { pdfBase64, schemaYaml: customYaml }
-          : { pdfBase64, preset };
+    const body = (pdfBase64: string) =>
+      preset === 'custom'
+        ? { pdfBase64, schemaYaml: customYaml }
+        : { pdfBase64, preset };
 
-      const res = await fetch('/api/extract', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error ?? 'Extraction failed');
-      setResult(json.result);
-      setSchema(json.schema);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
+    const pending = items.filter((it) => it.status !== 'done');
+    for (const it of pending) {
+      patchItem(it.id, { status: 'running', error: undefined });
+      try {
+        const pdfBase64 = await fileToBase64(it.file);
+        const res = await fetch('/api/extract', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body(pdfBase64)),
+        });
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error ?? 'Extraction failed');
+        patchItem(it.id, { status: 'done', result: json.result });
+        if (!schema && json.schema) setSchema(json.schema);
+      } catch (err) {
+        patchItem(it.id, {
+          status: 'error',
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
+    setLoading(false);
   };
 
   const downloadExcel = async () => {
-    if (!result || !schema || !file) return;
+    const doneItems = items.filter((it) => it.status === 'done' && it.result);
+    if (!schema || doneItems.length === 0) return;
     const res = await fetch('/api/export', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ schema, result, sourceName: file.name }),
+      body: JSON.stringify({
+        schema,
+        items: doneItems.map((it) => ({ sourceName: it.file.name, result: it.result })),
+      }),
     });
     if (!res.ok) {
       setError('Excel export failed');
@@ -119,25 +170,24 @@ export default function HomePage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${file.name.replace(/\.pdf$/i, '')}-extraction.xlsx`;
+    a.download = `extraction-${Date.now()}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const copyJson = async () => {
-    if (!result) return;
-    await navigator.clipboard.writeText(JSON.stringify(result, null, 2));
-  };
-
-  const reset = () => {
-    setFile(null);
-    setResult(null);
-    setSchema(null);
-    setError(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    const doneItems = items.filter((it) => it.status === 'done' && it.result);
+    if (doneItems.length === 0) return;
+    const payload = doneItems.map((it) => ({
+      source: it.file.name,
+      ...it.result,
+    }));
+    await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
   };
 
   const selectedPreset = PRESET_OPTIONS.find((p) => p.value === preset);
+  const doneCount = items.filter((it) => it.status === 'done').length;
+  const errorCount = items.filter((it) => it.status === 'error').length;
 
   return (
     <main className="min-h-screen">
@@ -161,7 +211,18 @@ export default function HomePage() {
       <div className="mx-auto max-w-5xl px-6 py-8 grid gap-6 md:grid-cols-2">
         <form onSubmit={onSubmit} className="flex flex-col gap-5">
           <section className="rounded-xl border border-neutral-200 bg-white p-5">
-            <h2 className="text-sm font-semibold mb-3">1. Upload a PDF</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold">1. Upload PDFs</h2>
+              {items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="text-xs text-neutral-500 hover:text-neutral-800 underline"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
             <div
               onDragOver={(e) => e.preventDefault()}
               onDrop={onDrop}
@@ -172,33 +233,55 @@ export default function HomePage() {
                 ref={fileInputRef}
                 type="file"
                 accept="application/pdf,.pdf"
+                multiple
                 className="hidden"
-                onChange={(e) => onPick(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
               />
-              {file ? (
-                <div className="text-sm">
-                  <div className="font-medium">{file.name}</div>
-                  <div className="text-xs text-neutral-500">
-                    {(file.size / 1024).toFixed(1)} KB &middot;{' '}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        reset();
-                      }}
-                      className="underline"
-                    >
-                      change
-                    </button>
-                  </div>
+              <div className="text-sm text-neutral-600">
+                <div className="font-medium">Drop PDFs here</div>
+                <div className="text-xs text-neutral-500 mt-1">
+                  or click to browse &middot; up to {MAX_FILES} files per run
                 </div>
-              ) : (
-                <div className="text-sm text-neutral-600">
-                  <div className="font-medium">Drop a PDF here</div>
-                  <div className="text-xs text-neutral-500 mt-1">or click to browse</div>
-                </div>
-              )}
+              </div>
             </div>
+
+            {items.length > 0 && (
+              <ul className="mt-3 flex flex-col gap-1.5">
+                {items.map((it) => (
+                  <li
+                    key={it.id}
+                    className="flex items-center justify-between gap-2 rounded border border-neutral-200 px-3 py-2 text-xs"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium text-neutral-800">{it.file.name}</div>
+                      <div className="text-neutral-500">
+                        {(it.file.size / 1024).toFixed(1)} KB
+                        {it.status === 'done' && it.result && (
+                          <>
+                            {' '}&middot; confidence {it.result.confidence.toFixed(2)}
+                          </>
+                        )}
+                        {it.status === 'error' && it.error && <> &middot; <span className="text-red-700">{shortErr(it.error)}</span></>}
+                      </div>
+                    </div>
+                    <StatusPill status={it.status} />
+                    {!loading && (
+                      <button
+                        type="button"
+                        onClick={() => removeItem(it.id)}
+                        className="text-neutral-400 hover:text-neutral-700"
+                        aria-label="Remove file"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           <section className="rounded-xl border border-neutral-200 bg-white p-5">
@@ -254,10 +337,14 @@ export default function HomePage() {
 
           <button
             type="submit"
-            disabled={loading || !file}
+            disabled={loading || items.length === 0}
             className="rounded-lg bg-neutral-900 text-white px-4 py-3 text-sm font-medium hover:bg-neutral-800 disabled:bg-neutral-300 disabled:cursor-not-allowed transition"
           >
-            {loading ? 'Extracting…' : 'Extract fields'}
+            {loading
+              ? `Extracting ${doneCount + errorCount + 1}/${items.length}…`
+              : items.length > 1
+                ? `Extract ${items.length} PDFs`
+                : 'Extract fields'}
           </button>
 
           {error && (
@@ -277,7 +364,7 @@ export default function HomePage() {
         <section className="rounded-xl border border-neutral-200 bg-white p-5 min-h-[300px]">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold">3. Results</h2>
-            {result && (
+            {doneCount > 0 && (
               <div className="flex gap-2">
                 <button
                   onClick={copyJson}
@@ -295,61 +382,28 @@ export default function HomePage() {
             )}
           </div>
 
-          {!result && !loading && (
+          {items.length === 0 && (
             <div className="text-sm text-neutral-500">
               {selectedPreset ? (
-                <>Extraction output will appear here. Selected schema: <span className="font-medium text-neutral-700">{selectedPreset.label}</span>.</>
+                <>Add PDFs and hit extract. Selected schema: <span className="font-medium text-neutral-700">{selectedPreset.label}</span>.</>
               ) : (
                 'Extraction output will appear here.'
               )}
             </div>
           )}
 
-          {loading && (
-            <div className="text-sm text-neutral-500">
-              Sending PDF to Gemini. This typically takes 5–20 seconds.
-            </div>
-          )}
-
-          {result && (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-wrap gap-2 text-xs">
-                <span className="rounded bg-neutral-100 px-2 py-1">
-                  confidence <span className="font-semibold">{result.confidence.toFixed(2)}</span>
-                </span>
-                <span className="rounded bg-neutral-100 px-2 py-1">
-                  model <span className="font-semibold">{result.model_used}</span>
-                </span>
-                {result.missing_fields.length > 0 && (
-                  <span className="rounded bg-amber-100 text-amber-900 px-2 py-1">
-                    {result.missing_fields.length} missing
-                  </span>
-                )}
-              </div>
-
-              {result.warnings.length > 0 && (
-                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
-                  <div className="text-xs font-semibold text-amber-900 mb-1">Warnings</div>
-                  <ul className="text-xs text-amber-900 list-disc pl-4 space-y-1">
-                    {result.warnings.map((w, i) => (
-                      <li key={i}>{w}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div>
-                <div className="text-xs font-semibold text-neutral-500 mb-1">Extracted fields</div>
-                <pre className="rounded-lg bg-neutral-900 text-neutral-100 text-xs p-3 overflow-auto max-h-[420px] whitespace-pre-wrap break-words">
-{JSON.stringify(result.data, null, 2)}
-                </pre>
-              </div>
-
-              {result.missing_fields.length > 0 && (
-                <div className="text-xs text-neutral-500">
-                  Missing: {result.missing_fields.join(', ')}
-                </div>
-              )}
+          {items.length > 0 && (
+            <div className="flex flex-col gap-3">
+              {items.map((it) => (
+                <ResultCard
+                  key={it.id}
+                  item={it}
+                  expanded={!!expanded[it.id]}
+                  onToggle={() =>
+                    setExpanded((prev) => ({ ...prev, [it.id]: !prev[it.id] }))
+                  }
+                />
+              ))}
             </div>
           )}
         </section>
@@ -361,6 +415,100 @@ export default function HomePage() {
       </footer>
     </main>
   );
+}
+
+function StatusPill({ status }: { status: FileStatus }) {
+  const style =
+    status === 'done'
+      ? 'bg-green-100 text-green-800'
+      : status === 'error'
+        ? 'bg-red-100 text-red-800'
+        : status === 'running'
+          ? 'bg-blue-100 text-blue-800'
+          : 'bg-neutral-100 text-neutral-600';
+  const label =
+    status === 'done' ? 'done' : status === 'error' ? 'error' : status === 'running' ? 'running' : 'pending';
+  return (
+    <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase ${style}`}>
+      {label}
+    </span>
+  );
+}
+
+function ResultCard({
+  item,
+  expanded,
+  onToggle,
+}: {
+  item: FileItem;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const { file, status, result, error } = item;
+  return (
+    <div className="rounded-lg border border-neutral-200">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-neutral-50"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium">{file.name}</div>
+          <div className="text-xs text-neutral-500 flex flex-wrap gap-x-2">
+            {status === 'done' && result && (
+              <>
+                <span>confidence {result.confidence.toFixed(2)}</span>
+                <span>model {result.model_used}</span>
+                {result.missing_fields.length > 0 && (
+                  <span className="text-amber-700">{result.missing_fields.length} missing</span>
+                )}
+                {result.warnings.length > 0 && (
+                  <span className="text-amber-700">{result.warnings.length} warning{result.warnings.length === 1 ? '' : 's'}</span>
+                )}
+              </>
+            )}
+            {status === 'running' && <span>extracting…</span>}
+            {status === 'pending' && <span>queued</span>}
+            {status === 'error' && <span className="text-red-700">{shortErr(error ?? 'failed')}</span>}
+          </div>
+        </div>
+        <StatusPill status={status} />
+      </button>
+
+      {expanded && status === 'done' && result && (
+        <div className="border-t border-neutral-200 p-3 flex flex-col gap-3">
+          {result.warnings.length > 0 && (
+            <div className="rounded border border-amber-300 bg-amber-50 p-2">
+              <div className="text-xs font-semibold text-amber-900 mb-1">Warnings</div>
+              <ul className="text-xs text-amber-900 list-disc pl-4 space-y-1">
+                {result.warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <pre className="rounded bg-neutral-900 text-neutral-100 text-xs p-3 overflow-auto max-h-[320px] whitespace-pre-wrap break-words">
+{JSON.stringify(result.data, null, 2)}
+          </pre>
+          {result.missing_fields.length > 0 && (
+            <div className="text-xs text-neutral-500">
+              Missing: {result.missing_fields.join(', ')}
+            </div>
+          )}
+        </div>
+      )}
+
+      {expanded && status === 'error' && (
+        <div className="border-t border-neutral-200 p-3 text-xs text-red-800">
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function shortErr(msg: string): string {
+  return msg.length > 80 ? `${msg.slice(0, 80)}…` : msg;
 }
 
 async function fileToBase64(file: File): Promise<string> {

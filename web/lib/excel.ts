@@ -2,10 +2,14 @@ import ExcelJS from 'exceljs';
 import type { ExtractionSchema } from './schema';
 import type { ExtractionResult } from './extractor';
 
+export type ExcelRow = {
+  sourceName: string;
+  result: ExtractionResult;
+};
+
 export async function buildExcel(
   schema: ExtractionSchema,
-  result: ExtractionResult,
-  sourceName: string,
+  rows: ExcelRow[],
 ): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Extraction');
@@ -15,20 +19,22 @@ export async function buildExcel(
 
   ws.columns = headers.map((h) => ({ header: h, key: h, width: 22 }));
 
-  const row: Record<string, unknown> = {
-    source: sourceName,
-    confidence: result.confidence,
-    missing_fields: result.missing_fields.join(', '),
-    warnings: result.warnings.join(' | '),
-    model_used: result.model_used,
-  };
-  for (const name of fieldNames) {
-    const v = result.data[name];
-    if (Array.isArray(v)) row[name] = v.join(', ');
-    else if (v === null || v === undefined) row[name] = '';
-    else row[name] = v;
+  for (const { sourceName, result } of rows) {
+    const row: Record<string, unknown> = {
+      source: sourceName,
+      confidence: result.confidence,
+      missing_fields: result.missing_fields.join(', '),
+      warnings: result.warnings.join(' | '),
+      model_used: result.model_used,
+    };
+    for (const name of fieldNames) {
+      const v = result.data[name];
+      if (Array.isArray(v)) row[name] = v.join(', ');
+      else if (v === null || v === undefined) row[name] = '';
+      else row[name] = v;
+    }
+    ws.addRow(row);
   }
-  ws.addRow(row);
 
   const header = ws.getRow(1);
   header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
