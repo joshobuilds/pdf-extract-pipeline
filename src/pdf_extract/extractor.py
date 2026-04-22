@@ -15,7 +15,8 @@ from google.genai import types
 from pdf_extract.schema import Schema
 
 MODEL = "gemini-2.5-flash"
-RETRY_DELAYS = (0.5, 1.5, 4.0)
+FALLBACK_MODEL = "gemini-2.5-flash-lite"
+RETRY_DELAYS = (1.0, 3.0, 8.0)
 
 
 @dataclass
@@ -42,10 +43,11 @@ def extract(
     tool = types.Tool(function_declarations=[schema.to_gemini_tool()])
 
     system_prompt = _build_system_prompt(schema)
+    extra_warnings: list[str] = []
 
-    response = _call_with_retry(
-        lambda: client.models.generate_content(
-            model=MODEL,
+    def call_model(model_name: str):
+        return client.models.generate_content(
+            model=model_name,
             contents=[
                 types.Content(
                     role="user",
@@ -68,14 +70,24 @@ def extract(
                 ),
             ),
         )
-    )
+
+    try:
+        response = _call_with_retry(lambda: call_model(MODEL))
+    except Exception as primary_err:
+        if not _is_retriable(str(primary_err)):
+            raise
+        extra_warnings.append(
+            f"Primary model {MODEL} unavailable after retries ({_short_err(primary_err)}); "
+            f"fell back to {FALLBACK_MODEL}."
+        )
+        response = _call_with_retry(lambda: call_model(FALLBACK_MODEL))
 
     call = _extract_function_call(response)
     args = dict(call.args or {})
 
     confidence = float(args.pop("_confidence", 0.0) or 0.0)
     missing = list(args.pop("_missing_fields", []) or [])
-    warnings = list(args.pop("_warnings", []) or [])
+    warnings = list(args.pop("_warnings", []) or []) + extra_warnings
 
     return ExtractionResult(
         data=args,
@@ -147,18 +159,30 @@ Rules:
     return base
 
 
+_RETRIABLE_MARKERS = (
+    "503", "429", "500", "502", "504",
+    "UNAVAILABLE", "overloaded", "high demand",
+)
+
+
+def _is_retriable(msg: str) -> bool:
+    return any(m.lower() in msg.lower() for m in _RETRIABLE_MARKERS)
+
+
+def _short_err(err: Exception) -> str:
+    msg = str(err)
+    return msg[:80] + "…" if len(msg) > 80 else msg
+
+
 def _call_with_retry(fn):
     """Retry on transient Gemini errors (429, 503, overloaded)."""
-    retriable_markers = ("503", "429", "500", "502", "504", "UNAVAILABLE", "overloaded", "high demand")
     last_err: Exception | None = None
     for attempt in range(len(RETRY_DELAYS) + 1):
         try:
             return fn()
         except Exception as err:
             last_err = err
-            msg = str(err)
-            is_retriable = any(m.lower() in msg.lower() for m in retriable_markers)
-            if not is_retriable or attempt == len(RETRY_DELAYS):
+            if not _is_retriable(str(err)) or attempt == len(RETRY_DELAYS):
                 raise
             time.sleep(RETRY_DELAYS[attempt])
     assert last_err is not None

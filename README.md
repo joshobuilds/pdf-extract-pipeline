@@ -148,7 +148,7 @@ print(result.warnings)      # list of strings
 4. The model also reports confidence, missing required fields, and warnings alongside the data.
 5. Results are validated and written to JSON + Excel.
 
-Transient errors (`503`, `429`, overloaded) retry with exponential backoff.
+Transient errors (`503`, `429`, overloaded) retry with exponential backoff. If the primary model (`gemini-2.5-flash`) stays unavailable after retries, the pipeline automatically falls back to `gemini-2.5-flash-lite` and records the fallback in the result's warnings.
 
 ---
 
